@@ -279,5 +279,4 @@ go test -bench=. -benchmem ./...
 ```
 
 ## License
-
-TODO
+MIT
