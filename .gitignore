@@ -1,0 +1,15 @@
+*.env*
+.vscode
+.idea
+.fleet
+.DS_Store
+docker/.env
+docker/data/users.yml
+*/*/*.old*
+configs
+vendor
+.claude
+
+**sandbox
+
+**pre-commit*.pyz

@@ -1,0 +1,86 @@
+version: "2"
+
+linters:
+  default: "all"
+  disable:
+    - asasalint # replacing {} to any
+    - varnamelen # Useless linter.
+    - exhaustive # Stupid linter.
+    - ireturn
+    # Bottom linters from 1.46, but CI use the 1.45.2.
+    - exhaustruct
+    - nosprintfhostport
+    - nonamedreturns
+    - wsl
+    - tagliatelle
+    - revive
+    - depguard # now i don't want to setup this
+    - godot
+  settings:
+    gocritic:
+      disabled-checks:
+        - captLocal
+    funlen:
+      lines: 100
+      statements: 60
+      ignore-comments: true
+    cyclop:
+      max-complexity: 15
+    errcheck:
+      check-type-assertions: true
+      verbose: true
+    errchkjson:
+      check-error-free-encoding: true
+      report-no-exported: true
+    errorlint:
+      errorf: true
+      errorf-multi: true
+    wrapcheck:
+      ignore-sigs:
+        - multierr.Combine(
+        - multierr.Append(
+        - .Errorf(
+        - errors.New(
+        - errors.Join(
+        - errors.Unwrap(
+        - .Wrap(
+        - .Wrapf(
+        - status.Error(
+        - pkgerr.MapPGErr
+      ignore-interface-regexps:
+        - .*
+    tagliatelle:
+      case:
+        use-field-name: true
+        rules:
+          json: snake
+          yaml: kebab
+    wsl_v5:
+      allow-whole-block: true
+      branch-max-lines: 2
+      case-max-lines: 0
+      default: all
+    godox:
+      keywords:
+        - BUG
+        - FIX
+        - FIXME
+        - TODO
+        - bug
+        - fixme
+        - todo
+        - fix
+    staticcheck:
+      checks: ["all", "-ST1017", "-ST1006", "-ST1003", "-ST1000"]
+  exclusions:
+    generated: lax
+    paths:
+      - .*\/sandbox\/.*
+      - .*\/vendor\/.*
+      - sandbox\/.*
+      - vendor\/.*
+
+formatters:
+  enable:
+    - gofmt
+    - goimports
