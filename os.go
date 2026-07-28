@@ -29,9 +29,17 @@ const frozenMacOSVersion = "10.15.7"
 // while the Version/ token keeps reporting the real coupled iOS version.
 const iosFreezeSafariMajor = 26
 
+// frozenIOSBuild is the Mobile/ token value real Safari has pinned since iOS 11.3;
+// WKWebView UAs carry the actual OS build instead.
+const frozenIOSBuild = "15E148"
+
 // detectOS parses OS information from comment tokens and product tokens.
 func detectOS(tokens []tokenizer.Token, result *Result, database *db.Database) {
 	if detectOSFromComments(tokens, result) {
+		if result.OS.Name == OSiOS {
+			result.OS.Build = extractIOSBuild(tokens)
+		}
+
 		fixFrozenIOSVersion(tokens, result)
 
 		return
@@ -181,6 +189,34 @@ func fixFrozenIOSVersion(tokens []tokenizer.Token, result *Result) {
 		return
 	}
 }
+
+func extractIOSBuild(tokens []tokenizer.Token) string {
+	for _, tok := range tokens {
+		if tok.Kind != tokenizer.KindProduct || tok.Name != "Mobile" {
+			continue
+		}
+
+		if tok.Version == frozenIOSBuild || !isIOSBuild(tok.Version) {
+			return ""
+		}
+
+		return tok.Version
+	}
+
+	return ""
+}
+
+const iosBuildMinLen = 4
+
+func isIOSBuild(v string) bool {
+	if len(v) < iosBuildMinLen {
+		return false
+	}
+
+	return isASCIIDigit(v[0]) && isASCIIDigit(v[1]) && v[2] >= 'A' && v[2] <= 'Z' && isASCIIDigit(v[3])
+}
+
+func isASCIIDigit(b byte) bool { return b >= '0' && b <= '9' }
 
 func detectOSFromDarwin(tokens []tokenizer.Token, result *Result, database *db.Database) {
 	for _, tok := range tokens {

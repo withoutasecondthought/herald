@@ -907,7 +907,88 @@ func TestParse_SafariIOS26FrozenUA(t *testing.T) {
 
 	assertEq(t, "OS.Name", r.OS.Name, "iOS")
 	assertEq(t, "OS.Version", r.OS.Version, "26.0")
+	assertEq(t, "OS.Build", r.OS.Build, "")
 	assertEq(t, "Browser.Name", r.Browser.Name, "Safari")
+}
+
+func TestParse_IOSBuildFromWebView(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22F76 " +
+		"[FBAN/FBIOS;FBAV/508.0.0.45.104;FBBV/745820538;FBDV/iPhone14,5;FBMD/iPhone;" +
+		"FBSN/iOS;FBSV/18.5;FBSS/3;FBID/phone;FBLC/en_US;FBOP/5;IABMV/1]"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Name", r.OS.Name, "iOS")
+	assertEq(t, "OS.Version", r.OS.Version, "18.5")
+	assertEq(t, "OS.Build", r.OS.Build, "22F76")
+}
+
+func TestParse_IOSBuildMetaIABFrozenUA(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/23A330 MetaIAB Instagram NW/3 Safari/604.1"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Name", r.OS.Name, "iOS")
+	assertEq(t, "OS.Version", r.OS.Version, "18.6")
+	assertEq(t, "OS.Build", r.OS.Build, "23A330")
+}
+
+func TestParse_IOSBuildShortFBAN(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/23C55 Safari/604.1 " +
+		"[FBAN/FBIOS;FBAV/550.0.0.34.65;IABMV/1]"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Version", r.OS.Version, "18.7")
+	assertEq(t, "OS.Build", r.OS.Build, "23C55")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Facebook")
+}
+
+func TestParse_IOSBuildKeepsCommentVersion(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6_2 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/22G100 [FBAN/FBIOS;FBAV/550.0.0.34.65;IABMV/1]"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Version", r.OS.Version, "18.6.2")
+	assertEq(t, "OS.Build", r.OS.Build, "22G100")
+}
+
+func TestParse_IOSBuildWithInstagramAttrs(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/23A355 " +
+		"Instagram 401.1.0.45.83 (iPhone17,3; iOS 26_0_1; en_US; en; scale=3.00; 1179x2556; 123456789)"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Version", r.OS.Version, "26.0.1")
+	assertEq(t, "OS.Build", r.OS.Build, "23A355")
+	assertEq(t, "Device.ModelRaw", r.Device.ModelRaw, "iPhone17,3")
+}
+
+func TestParse_AndroidNoBuild(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/142.0.0.0 Mobile Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Name", r.OS.Name, "Android")
+	assertEq(t, "OS.Build", r.OS.Build, "")
 }
 
 func TestParse_SnapchatIAB(t *testing.T) {

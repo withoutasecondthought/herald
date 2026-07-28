@@ -160,7 +160,7 @@ type Result struct {
     Raw        string
     ClientType ClientType
     Browser    Browser   // Name, Version, Engine
-    OS         OS        // Name, Version
+    OS         OS        // Name, Version, Build
     Device     Device    // Type, Model, ModelRaw
     IAB        IABInfo   // App, AppVersion, Locale, ScreenScale, ...
     Bot        BotInfo   // Name, Owner, Category, Confidence
@@ -190,6 +190,7 @@ if !r.Browser.IsEmpty() {
 |---|---|
 | `Name` | `"iOS"`, `"Android"`, `"Windows"`, `"macOS"`, `"Linux"` |
 | `Version` | `"18.7"`, `"14"`, `"10"` |
+| `Build` | `"23A355"` — real iOS build from the `Mobile/` token (WebView UAs); empty outside iOS and for Safari's frozen `15E148` |
 
 ### Device
 

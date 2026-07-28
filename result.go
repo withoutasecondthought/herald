@@ -92,6 +92,7 @@ func (b Browser) IsEmpty() bool { return b.Name == "" }
 type OS struct {
 	Name    string // "iOS", "Android", "Windows", "macOS"
 	Version string // "18.7", "14", "11"
+	Build   string // "23A355" — real iOS build from the Mobile/ token; empty outside iOS and for frozen Safari
 }
 
 // IsEmpty returns true if no OS was detected.
