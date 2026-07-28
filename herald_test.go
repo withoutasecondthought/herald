@@ -152,7 +152,7 @@ func TestParse_SafariMacOS(t *testing.T) {
 
 	assertEq(t, "Browser.Name", r.Browser.Name, "Safari")
 	assertEq(t, "OS.Name", r.OS.Name, "macOS")
-	assertEq(t, "OS.Version", r.OS.Version, "10.15.7")
+	assertEq(t, "OS.Version", r.OS.Version, "")
 	assertEq(t, "Device.Type", r.Device.Type, "desktop")
 }
 
@@ -292,7 +292,7 @@ func TestParseWithHints_Windows11(t *testing.T) {
 
 	assertEq(t, "OS.Name", r.OS.Name, "Windows")
 	assertEq(t, "OS.Version", r.OS.Version, "11")
-	assertEq(t, "Browser.Name", r.Browser.Name, "Google Chrome")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Chrome")
 	assertEq(t, "Browser.Version", r.Browser.Version, "120")
 }
 
@@ -727,6 +727,564 @@ func TestNewParser_WithOverrides(t *testing.T) {
 	// Built-in data still works.
 	r2 := p.Parse("Googlebot/2.1")
 	assertEq(t, "Bot.ClientType", r2.ClientType, herald.ClientTypeBot)
+}
+
+func TestParse_EdgeIOS(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Version/17.0 EdgiOS/120.0.0.0 Mobile/15E148 Safari/604.1"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Edge")
+	assertEq(t, "Browser.Version", r.Browser.Version, "120.0.0.0")
+	assertEq(t, "Browser.Engine", r.Browser.Engine, "WebKit")
+}
+
+func TestParse_FacebookAndroidFBIAB(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 15; SM-A055F Build/AP3A.240905.015.A2) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/150.0.7871.124 Mobile Safari/537.36 " +
+		"[FB_IAB/FB4A;FBAV/567.1.0.52.74;IABMV/1;]"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Facebook")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "567.1.0.52.74")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Facebook")
+	assertEq(t, "OS.Version", r.OS.Version, "15")
+	assertEq(t, "Device.Model", r.Device.Model, "Samsung Galaxy A05")
+}
+
+func TestParse_MessengerAndroid(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 6.0; ALE-L21 Build/HuaweiALE-L21; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/68.0.3440.91 Mobile Safari/537.36 " +
+		"[FB_IAB/Orca-Android;FBAV/181.0.0.12.78;]"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Messenger")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Messenger")
+}
+
+func TestParse_FacebookLite(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; POT-LX1 Build/HUAWEIPOT-L21; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/120.0.0.0 Mobile Safari/537.36 " +
+		"[FBAN/EMA;FBLC/nl_NL;FBAV/218.0.0.6.119;]"
+	r := p.Parse(ua)
+
+	assertEq(t, "IAB.App", r.IAB.App, "Facebook Lite")
+	assertEq(t, "IAB.Locale", r.IAB.Locale, "nl_NL")
+}
+
+func TestParse_TikTokIOSUnderscore(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_2_1 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Mobile/15E148 BytedanceWebview/d8a21c6 musical_ly_32.8.0 JsSdk/2.0 " +
+		"NetType/WIFI Channel/App ByteLocale/ar Region/SA"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "TikTok")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "32.8.0")
+	assertEq(t, "IAB.Locale", r.IAB.Locale, "ar")
+	assertEq(t, "IAB.Region", r.IAB.Region, "SA")
+	assertEq(t, "Browser.Name", r.Browser.Name, "TikTok")
+}
+
+func TestParse_TikTokAndroidTrill(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 11; SM-A155M Build/RP1A.200720.012; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/91.0.4472.120 Mobile Safari/537.36 " +
+		"trill_2023103040 JsSdk/1.0 NetType/WIFI Channel/googleplay " +
+		"AppName/musical_ly app_version/31.3.4 ByteLocale/it-IT " +
+		"ByteFullLocale/it-IT Region/IT BytedanceWebview/d8a21c6"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "TikTok")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "31.3.4")
+	assertEq(t, "IAB.Locale", r.IAB.Locale, "it-IT")
+}
+
+func TestParse_InstagramAndroidFrozenBase(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; K; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/150.0.0.0 Mobile Safari/537.36 " +
+		"Instagram 439.0.0.37.89 Android " +
+		"(35/15; 450dpi; 1080x2400; Xiaomi/Redmi; 24094RAD4G; citrine; mt6855; it_IT; 1021815691; IABMV/1)"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Instagram")
+	assertEq(t, "OS.Version", r.OS.Version, "15")
+	assertEq(t, "Device.ModelRaw", r.Device.ModelRaw, "24094RAD4G")
+	assertEq(t, "IAB.Locale", r.IAB.Locale, "it_IT")
+}
+
+func TestParse_ReducedAndroidChrome(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; K) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/151.0.0.0 Mobile Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Name", r.OS.Name, "Android")
+	assertEq(t, "OS.Version", r.OS.Version, "")
+	assertEq(t, "Device.ModelRaw", r.Device.ModelRaw, "")
+	assertEq(t, "Device.Type", r.Device.Type, "mobile")
+}
+
+func TestParse_ReducedAndroidTablet(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; K) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/151.0.0.0 Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "Device.Type", r.Device.Type, "tablet")
+}
+
+func TestParse_FirefoxAndroid(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	r := p.Parse("Mozilla/5.0 (Android 13; Mobile; rv:109.0) Gecko/109.0 Firefox/117.0")
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Firefox")
+	assertEq(t, "Device.ModelRaw", r.Device.ModelRaw, "")
+	assertEq(t, "Device.Type", r.Device.Type, "mobile")
+}
+
+func TestParse_ChromeOS(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (X11; CrOS x86_64 14541.0.0) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/141.0.0.0 Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Name", r.OS.Name, "Chrome OS")
+	assertEq(t, "Device.Type", r.Device.Type, "desktop")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Chrome")
+}
+
+func TestParse_SafariIOS26FrozenUA(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_6 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Version/26.0 Mobile/15E148 Safari/604.1"
+	r := p.Parse(ua)
+
+	assertEq(t, "OS.Name", r.OS.Name, "iOS")
+	assertEq(t, "OS.Version", r.OS.Version, "26.0")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Safari")
+}
+
+func TestParse_SnapchatIAB(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 14; moto g play - 2024 Build/U1UD34M.16-56-2; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/131.0.6778.39 Mobile Safari/537.36 Snapchat/13.17.0.42"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Snapchat")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "13.17.0.42")
+}
+
+func TestParse_SnapchatNativeApp(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	r := p.Parse("Snapchat/11.1.1.66 (Pixel 3 XL; Android 11; gzip)")
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeNativeApp)
+	assertEq(t, "Native.Name", r.Native.Name, "Snapchat")
+}
+
+func TestParse_TelegramAndroid(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 14; K) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/134.0.6998.135 Mobile Safari/537.36 " +
+		"Telegram-Android/11.9.0 (Samsung SM-A155M; Android 14; SDK 34; AVERAGE)"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Telegram")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "11.9.0")
+	assertEq(t, "OS.Version", r.OS.Version, "14")
+	assertEq(t, "Device.ModelRaw", r.Device.ModelRaw, "SM-A155M")
+}
+
+func TestParse_LineAndroid(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 11; SM-G991B) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/95.0.4638.74 Mobile Safari/537.36 Line/11.5.2/IAB"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "LINE")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "11.5.2")
+}
+
+func TestParse_WeChat(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 12; ALN-AL00 Build/HUAWEIALN-AL00; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/134.0.6998.136 Mobile Safari/537.36 " +
+		"XWEB/1340043 MMWEBSDK/20250201 MMWEBID/783 " +
+		"MicroMessenger/8.0.57.2820(0x2800393F) WeChat/arm64 Weixin " +
+		"NetType/WIFI Language/zh_CN ABI/arm64"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "WeChat")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "8.0.57.2820")
+	assertEq(t, "IAB.Locale", r.IAB.Locale, "zh_CN")
+	assertEq(t, "IAB.NetType", r.IAB.NetType, "WIFI")
+}
+
+func TestParse_TwitterIOS(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Mobile/23F77 Twitter for iPhone/12.5"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Twitter")
+	assertEq(t, "IAB.AppVersion", r.IAB.AppVersion, "12.5")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Twitter")
+	assertEq(t, "Browser.Engine", r.Browser.Engine, "WebKit")
+}
+
+func TestParse_TwitterAndroid(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 14; moto g stylus 5G - 2024) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/130.0.0.0 Mobile Safari/537.36 TwitterAndroid"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Twitter")
+}
+
+func TestParse_GSAiOS(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 18_1 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"GSA/355.0.755551703 Mobile/15E148 Safari/604.1"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Google App")
+	assertEq(t, "Browser.Name", r.Browser.Name, "Google App")
+}
+
+func TestParse_PinterestIOSBlock(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Mobile/15E148 Safari/604.1 [Pinterest/iOS]"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Pinterest")
+}
+
+func TestParse_PinterestAndroidNative(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	r := p.Parse("Pinterest for Android/10.9.3 (Infinix-X689F; 11)")
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeNativeApp)
+	assertEq(t, "Native.Name", r.Native.Name, "Pinterest")
+	assertEq(t, "Native.Version", r.Native.Version, "10.9.3")
+}
+
+func TestParse_MetaIABMVFallback(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; K; wv) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/150.0.0.0 Mobile Safari/537.36 IABMV/1"
+	r := p.Parse(ua)
+
+	assertEq(t, "ClientType", r.ClientType, herald.ClientTypeIAB)
+	assertEq(t, "IAB.App", r.IAB.App, "Meta")
+}
+
+func TestParse_MiBrowser(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 15; POCO M6 Build/AP3A.240905.015.A2) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/123.0.6312.118 Mobile Safari/537.36 XiaoMi/MiuiBrowser/14.44.1-gn"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Mi Browser")
+	assertEq(t, "Browser.Version", r.Browser.Version, "14.44.1-gn")
+}
+
+func TestParse_UCBrowser(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; U; Android 13; en-US; SM-A155F Build/TP1A.220624.014) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Version/4.0 Chrome/100.0.4896.58 UCBrowser/13.4.0.1306 Mobile Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "UC Browser")
+}
+
+func TestParse_HuaweiBrowser(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 10; HarmonyOS; ELS-NX9; HMSCore 6.1.0.314) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/88.0.4324.93 HuaweiBrowser/11.1.5.310 Mobile Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Huawei Browser")
+}
+
+func TestParse_OperaMiniPresto(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	r := p.Parse("Opera/9.80 (Android; Opera Mini/33.0.2254/174.101; U; en) Presto/2.12.423 Version/12.16")
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Opera Mini")
+	assertEq(t, "Browser.Version", r.Browser.Version, "33.0.2254")
+	assertEq(t, "Browser.Engine", r.Browser.Engine, herald.EnginePresto)
+}
+
+func TestParse_OperaMiniIOS(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"OPiOS/16.0.15.124050 Mobile/15E148 Safari/9537.53"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Opera Mini")
+}
+
+func TestParse_DuckDuckGoAndroid(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 14; SM-S911B) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/147.0.7727.111 Mobile DuckDuckGo/5 Safari/537.36"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "DuckDuckGo")
+	assertEq(t, "Browser.Engine", r.Browser.Engine, "Blink")
+}
+
+func TestParse_OperaGXMobile(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (Linux; Android 14; SM-S911B) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/150.0.7871.46 Mobile Safari/537.36 OPX/3.1"
+	r := p.Parse(ua)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Opera GX")
+}
+
+func TestParseWithHints_ModelResolution(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+
+	hints := herald.ClientHints{
+		UA:       `"Chromium";v="151", "Google Chrome";v="151"`,
+		Platform: "Android",
+		Mobile:   true,
+		Model:    "SM-S938B",
+	}
+	ua := "Mozilla/5.0 (Linux; Android 10; K) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/151.0.0.0 Mobile Safari/537.36"
+	r := p.ParseWithHints(ua, hints)
+
+	assertEq(t, "Device.ModelRaw", r.Device.ModelRaw, "SM-S938B")
+	assertEq(t, "Device.Model", r.Device.Model, "Samsung Galaxy S25 Ultra")
+}
+
+func TestParseWithHints_AndroidTablet(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+
+	hints := herald.ClientHints{
+		UA:       `"Chromium";v="151", "Google Chrome";v="151"`,
+		Platform: "Android",
+		Mobile:   false,
+	}
+	ua := "Mozilla/5.0 (Linux; Android 10; K) " +
+		"AppleWebKit/537.36 (KHTML, like Gecko) " +
+		"Chrome/151.0.0.0 Safari/537.36"
+	r := p.ParseWithHints(ua, hints)
+
+	assertEq(t, "Device.Type", r.Device.Type, "tablet")
+}
+
+func TestParseWithHints_Brave(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+
+	hints := herald.ClientHints{
+		UA: `"Chromium";v="136", "Brave";v="136", "Not.A/Brand";v="99"`,
+	}
+	r := p.ParseWithHints(uaChromeWin, hints)
+
+	assertEq(t, "Browser.Name", r.Browser.Name, "Brave")
+}
+
+func TestParse_Darwin27(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	r := p.Parse("App/1.0 CFNetwork/3860.100.1 Darwin/27.0.0")
+
+	assertEq(t, "OS.Name", r.OS.Name, "Darwin")
+	assertEq(t, "OS.Version", r.OS.Version, "27")
+}
+
+func TestParse_VisionProFBDV(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 26_0 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Mobile/15E148 [FBAN/FBIOS;FBAV/500.0.0.0.1;FBDV/RealityDevice14,1;FBSN/visionOS;FBSV/26.0]"
+	r := p.Parse(ua)
+
+	assertEq(t, "IAB.App", r.IAB.App, "Facebook")
+	assertEq(t, "Device.Model", r.Device.Model, "Apple Vision Pro")
+}
+
+func TestParse_IPhone17eInstagram(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+	ua := "Mozilla/5.0 (iPhone; CPU iPhone OS 26_1 like Mac OS X) " +
+		"AppleWebKit/605.1.15 (KHTML, like Gecko) " +
+		"Mobile/15E148 Instagram 374.1.10.34.80 " +
+		"(iPhone18,5; iOS 26_1; en_US; en-US; scale=3.00; 1179x2556; 715949514; IABMV/1)"
+	r := p.Parse(ua)
+
+	assertEq(t, "IAB.App", r.IAB.App, "Instagram")
+	assertEq(t, "Device.Model", r.Device.Model, "iPhone 17e")
+	assertEq(t, "OS.Version", r.OS.Version, "26.1")
+}
+
+func TestParse_NewBotPatterns(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+
+	cases := []struct{ ua, name string }{
+		{
+			"Mozilla/5.0 AppleWebKit/537.36 " +
+				"(KHTML, like Gecko; compatible; Claude-User/1.0; +claude-user@anthropic.com)",
+			"Claude User",
+		},
+		{
+			"Mozilla/5.0 AppleWebKit/537.36 " +
+				"(KHTML, like Gecko; compatible; Perplexity-User/1.0; +https://perplexity.ai/perplexity-user)",
+			"Perplexity User",
+		},
+		{
+			"Mozilla/5.0 (compatible; Amazonbot/0.1; +https://developer.amazon.com/support/amazonbot)",
+			"Amazonbot",
+		},
+		{"WhatsApp/2.23.20.0", "WhatsApp Link Preview"},
+	}
+
+	for _, c := range cases {
+		r := p.Parse(c.ua)
+
+		assertEq(t, "ClientType "+c.name, r.ClientType, herald.ClientTypeBot)
+		assertEq(t, "Bot.Name "+c.name, r.Bot.Name, c.name)
+	}
+}
+
+func TestLookup_NewDeviceModels(t *testing.T) {
+	t.Parallel()
+
+	p := newTestParser(t)
+
+	if name, ok := p.LookupAppleModel("iPhone18,5"); !ok || name != "iPhone 17e" {
+		t.Errorf("iPhone18,5: got %q, %v", name, ok)
+	}
+
+	if dev, ok := p.LookupAndroidModel("SM-S931B"); !ok || dev.Model != "Galaxy S25" {
+		t.Errorf("SM-S931B: got %+v, %v", dev, ok)
+	}
+
+	if dev, ok := p.LookupAndroidModel("2409BRN2CY"); !ok || dev.Model != "Redmi 14C" {
+		t.Errorf("2409BRN2CY: got %+v, %v", dev, ok)
+	}
 }
 
 func assertEq[T comparable](t *testing.T, field string, got, want T) {

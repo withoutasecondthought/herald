@@ -1,6 +1,7 @@
 package herald
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/withoutasecondthought/herald/db"
@@ -20,9 +21,19 @@ var windowsVersions = map[string]string{
 
 const macOSXPrefix = "Mac OS X "
 
+// frozenMacOSVersion is the value all modern browsers permanently report on macOS;
+// it is a freeze sentinel, not the real OS version.
+const frozenMacOSVersion = "10.15.7"
+
+// iosFreezeSafariMajor marks Safari 26+, whose UAs freeze the OS token at 18_6/18_7
+// while the Version/ token keeps reporting the real coupled iOS version.
+const iosFreezeSafariMajor = 26
+
 // detectOS parses OS information from comment tokens and product tokens.
 func detectOS(tokens []tokenizer.Token, result *Result, database *db.Database) {
 	if detectOSFromComments(tokens, result) {
+		fixFrozenIOSVersion(tokens, result)
+
 		return
 	}
 
@@ -56,35 +67,20 @@ func matchOSAttr(attr string, allAttrs []string, result *Result) bool {
 		}
 	}
 
-	if v, ok := strings.CutPrefix(attr, OSAndroid); ok {
-		result.OS = OS{Name: OSAndroid, Version: strings.TrimSpace(v)}
-
+	if matchAndroidAttr(attr, allAttrs, result) {
 		return true
 	}
 
-	if ntVer, ok := strings.CutPrefix(attr, "Windows NT"); ok {
-		ntVer = strings.TrimSpace(ntVer)
-
-		winVer := ntVer
-		if mapped, ok := windowsVersions[ntVer]; ok {
-			winVer = mapped
-		}
-
-		result.OS = OS{Name: OSWindows, Version: winVer}
-
+	if matchWindowsAttr(attr, result) {
 		return true
 	}
 
-	if strings.HasPrefix(attr, "Macintosh") {
-		result.OS = OS{Name: OSmacOS}
+	if matchMacintoshAttr(attr, allAttrs, result) {
+		return true
+	}
 
-		for _, a2 := range allAttrs {
-			a2 = strings.TrimSpace(a2)
-
-			if v := parseMacOSVersion(a2); v != "" {
-				result.OS.Version = v
-			}
-		}
+	if strings.HasPrefix(attr, "CrOS") {
+		result.OS = OS{Name: OSChromeOS}
 
 		return true
 	}
@@ -94,6 +90,96 @@ func matchOSAttr(attr string, allAttrs []string, result *Result) bool {
 	}
 
 	return false
+}
+
+func matchAndroidAttr(attr string, allAttrs []string, result *Result) bool {
+	v, ok := strings.CutPrefix(attr, OSAndroid)
+	if !ok {
+		return false
+	}
+
+	ver := strings.TrimSpace(v)
+	if ver == "10" && hasFrozenModelK(allAttrs) {
+		ver = ""
+	}
+
+	result.OS = OS{Name: OSAndroid, Version: ver}
+
+	return true
+}
+
+func matchWindowsAttr(attr string, result *Result) bool {
+	ntVer, ok := strings.CutPrefix(attr, "Windows NT")
+	if !ok {
+		return false
+	}
+
+	ntVer = strings.TrimSpace(ntVer)
+
+	winVer := ntVer
+	if mapped, ok := windowsVersions[ntVer]; ok {
+		winVer = mapped
+	}
+
+	result.OS = OS{Name: OSWindows, Version: winVer}
+
+	return true
+}
+
+func matchMacintoshAttr(attr string, allAttrs []string, result *Result) bool {
+	if !strings.HasPrefix(attr, "Macintosh") {
+		return false
+	}
+
+	result.OS = OS{Name: OSmacOS}
+
+	for _, a2 := range allAttrs {
+		a2 = strings.TrimSpace(a2)
+
+		if v := parseMacOSVersion(a2); v != "" && v != frozenMacOSVersion {
+			result.OS.Version = v
+		}
+	}
+
+	return true
+}
+
+// hasFrozenModelK reports whether the comment carries the reduced-UA placeholder model
+// ("Android 10; K" / "Android 10; K; wv"), meaning the version is a freeze constant.
+func hasFrozenModelK(attrs []string) bool {
+	for _, a := range attrs {
+		if strings.TrimSpace(a) == "K" {
+			return true
+		}
+	}
+
+	return false
+}
+
+func fixFrozenIOSVersion(tokens []tokenizer.Token, result *Result) {
+	if result.OS.Name != OSiOS {
+		return
+	}
+
+	frozen := strings.HasPrefix(result.OS.Version, "18.6") || strings.HasPrefix(result.OS.Version, "18.7")
+	if !frozen {
+		return
+	}
+
+	for _, tok := range tokens {
+		if tok.Kind != tokenizer.KindProduct || tok.Name != "Version" || tok.Version == "" {
+			continue
+		}
+
+		major, _, _ := strings.Cut(tok.Version, ".")
+
+		n, err := strconv.Atoi(major)
+		if err == nil && n >= iosFreezeSafariMajor {
+			result.OS.Version = tok.Version
+		}
+
+		return
+	}
 }
 
 func detectOSFromDarwin(tokens []tokenizer.Token, result *Result, database *db.Database) {

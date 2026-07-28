@@ -14,7 +14,7 @@ func detectDevice(tokens []tokenizer.Token, result *Result, database *db.Databas
 		detectAppleDevice(tokens, result, database)
 	case OSAndroid:
 		detectAndroidDevice(tokens, result, database)
-	case OSWindows, OSmacOS, OSLinux:
+	case OSWindows, OSmacOS, OSLinux, OSChromeOS:
 		result.Device = Device{Type: DeviceDesktop}
 	}
 }
@@ -46,7 +46,8 @@ func findAppleModelRaw(tokens []tokenizer.Token) string {
 
 			isApple := strings.HasPrefix(attr, "iPhone") ||
 				strings.HasPrefix(attr, "iPad") ||
-				strings.HasPrefix(attr, "iPod")
+				strings.HasPrefix(attr, "iPod") ||
+				strings.HasPrefix(attr, "RealityDevice")
 
 			if isApple && strings.Contains(attr, ",") {
 				return attr
@@ -77,7 +78,7 @@ func resolveAppleDeviceType(rawModel string, result *Result) string {
 
 func detectAndroidDevice(tokens []tokenizer.Token, result *Result, database *db.Database) {
 	rawModel := findAndroidModelRaw(tokens)
-	deviceType := resolveAndroidDeviceType(rawModel, result.Raw)
+	deviceType := resolveAndroidDeviceType(rawModel, result.Raw, tokens)
 
 	result.Device = Device{
 		Type:     deviceType,
@@ -108,22 +109,38 @@ func findAndroidModelRaw(tokens []tokenizer.Token) string {
 				continue
 			}
 
-			if foundAndroid && attr != "" && !isLocaleCode(attr) {
-				model := stripBrandPrefix(attr)
-
-				if buildIdx := strings.Index(model, " Build/"); buildIdx >= 0 {
-					model = model[:buildIdx]
-				}
-
-				return strings.TrimSpace(model)
+			if !foundAndroid || attr == "" || isLocaleCode(attr) {
+				continue
 			}
+
+			if attr == "K" {
+				return ""
+			}
+
+			if isFormFactorAttr(attr) {
+				continue
+			}
+
+			model := stripBrandPrefix(attr)
+
+			if buildIdx := strings.Index(model, " Build/"); buildIdx >= 0 {
+				model = model[:buildIdx]
+			}
+
+			return strings.TrimSpace(model)
 		}
 	}
 
 	return ""
 }
 
-func resolveAndroidDeviceType(rawModel, rawUA string) string {
+// isFormFactorAttr filters Firefox form-factor and webview markers that occupy
+// the model slot in UAs that carry no real device model.
+func isFormFactorAttr(attr string) bool {
+	return attr == "Mobile" || attr == "Tablet" || attr == "wv" || strings.HasPrefix(attr, "rv:")
+}
+
+func resolveAndroidDeviceType(rawModel, rawUA string, tokens []tokenizer.Token) string {
 	if strings.Contains(rawUA, "Tablet") {
 		return DeviceTablet
 	}
@@ -132,7 +149,23 @@ func resolveAndroidDeviceType(rawModel, rawUA string) string {
 		return DeviceTablet
 	}
 
+	if rawModel == "" && hasSafariProduct(tokens) && !strings.Contains(rawUA, "Mobile") {
+		return DeviceTablet
+	}
+
 	return DeviceMobile
+}
+
+// hasSafariProduct distinguishes WebKit-style browser UAs (where a missing "Mobile"
+// token is the reduced-UA tablet signal) from native-app UAs that never carry it.
+func hasSafariProduct(tokens []tokenizer.Token) bool {
+	for _, tok := range tokens {
+		if tok.Kind == tokenizer.KindProduct && tok.Name == "Safari" {
+			return true
+		}
+	}
+
+	return false
 }
 
 // isLocaleCode returns true if s looks like a BCP 47 locale tag (e.g., "zh-cn", "en-US").
@@ -159,7 +192,7 @@ func isAlpha(b byte) bool {
 
 func stripBrandPrefix(model string) string {
 	prefixes := []string{
-		"SAMSUNG ", "samsung ",
+		"SAMSUNG ", "Samsung ", "samsung ",
 		"HUAWEI ", "huawei ",
 		"OPPO ", "Oppo ",
 		"vivo ", "Vivo ",

@@ -3,6 +3,8 @@ package herald
 import (
 	"strconv"
 	"strings"
+
+	"github.com/withoutasecondthought/herald/db"
 )
 
 const (
@@ -10,19 +12,27 @@ const (
 	chVersionPrefixLen      = 2 // "v=" length
 )
 
+// chBrandNames normalizes Client Hints brand strings to the names herald derives
+// from UA strings, so the same browser gets one name regardless of source.
+//
+//nolint:gochecknoglobals // read-only lookup table
+var chBrandNames = map[string]string{
+	"Google Chrome":    "Chrome",
+	"Chromium":         "Chrome",
+	"Microsoft Edge":   "Edge",
+	"Samsung Internet": "Samsung Browser",
+}
+
 // applyHints enriches the result with Client Hints data.
 // Client Hints take priority over UA string data.
-func applyHints(hints *ClientHints, result *Result) {
+func applyHints(hints *ClientHints, result *Result, database *db.Database) {
 	if hints == nil || hints.IsEmpty() {
 		return
 	}
 
 	applyPlatformHint(hints, result)
 	applyBrowserHint(hints, result)
-
-	if hints.Model != "" {
-		result.Device.ModelRaw = hints.Model
-	}
+	applyModelHint(hints, result, database)
 
 	if hints.Mobile && (result.Device.Type == "" || result.Device.Type == DeviceDesktop) {
 		result.Device.Type = DeviceMobile
@@ -82,9 +92,33 @@ func applyBrowserHint(hints *ClientHints, result *Result) {
 	}
 
 	name, version := parseCHUA(src)
-	if name != "" {
-		result.Browser.Name = name
-		result.Browser.Version = version
+	if name == "" {
+		return
+	}
+
+	if mapped, ok := chBrandNames[name]; ok {
+		name = mapped
+	}
+
+	result.Browser.Name = name
+	result.Browser.Version = version
+}
+
+func applyModelHint(hints *ClientHints, result *Result, database *db.Database) {
+	if hints.Model == "" {
+		return
+	}
+
+	result.Device.ModelRaw = hints.Model
+
+	if dev, ok := database.AndroidDB[hints.Model]; ok {
+		result.Device.Model = dev.Brand + " " + dev.Model
+
+		return
+	}
+
+	if name, ok := database.AppleModels[hints.Model]; ok {
+		result.Device.Model = name
 	}
 }
 

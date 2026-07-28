@@ -21,7 +21,7 @@ const (
 	entropyThreshold = 3.0
 
 	chromeMinVersion = 60
-	chromeMaxVersion = 170
+	chromeMaxVersion = 250
 
 	freqMapCap = 64
 )

@@ -65,7 +65,7 @@ func (p *Parser) run(raw string, hints *ClientHints) *Result {
 	p.runStages(clientType, tokens, result)
 
 	if hints != nil {
-		applyHints(hints, result)
+		applyHints(hints, result, p.db)
 	}
 
 	return result
@@ -121,22 +121,63 @@ func classifyClient(tokens []tokenizer.Token, raw string) ClientType {
 }
 
 func classifyByTokens(tokens []tokenizer.Token) (ClientType, bool) {
-	for _, tok := range tokens {
+	hasMozilla := hasMozillaPrefix(tokens)
+
+	for i, tok := range tokens {
 		if tok.Kind == tokenizer.KindFBBlock {
 			return ClientTypeIAB, true
 		}
 
-		if tok.Kind == tokenizer.KindProduct {
-			switch tok.Name {
-			case "FBAV", "Instagram", "musical_ly", "Barcelona", "MetaIAB":
-				return ClientTypeIAB, true
-			case ProductCFNetwork, "okhttp", "Dalvik":
-				return ClientTypeNativeApp, true
-			}
+		if tok.Kind != tokenizer.KindProduct {
+			continue
+		}
+
+		if ct, ok := classifyProduct(tokens, i, hasMozilla); ok {
+			return ct, true
 		}
 	}
 
 	return 0, false
+}
+
+func classifyProduct(tokens []tokenizer.Token, idx int, hasMozilla bool) (ClientType, bool) {
+	tok := tokens[idx]
+
+	switch tok.Name {
+	case "FBAV", "Instagram", "Barcelona", "MetaIAB", keyIABMV,
+		tokenTwitterAndroid, "Telegram-Android", "Line", "MicroMessenger", "GSA":
+		return ClientTypeIAB, true
+	case ProductCFNetwork, "okhttp", "Dalvik":
+		return ClientTypeNativeApp, true
+	case "Snapchat":
+		if hasMozilla {
+			return ClientTypeIAB, true
+		}
+
+		return ClientTypeNativeApp, true
+	case appTwitter:
+		if _, ok := twitterForTarget(tokens, idx); ok {
+			return ClientTypeIAB, true
+		}
+	case "Pinterest":
+		if !hasMozilla && isProductAt(tokens, idx+1, "for") {
+			return ClientTypeNativeApp, true
+		}
+	}
+
+	if isTikTokToken(tok) {
+		return ClientTypeIAB, true
+	}
+
+	if strings.HasPrefix(tok.Name, "com.google.android.youtube") {
+		return ClientTypeNativeApp, true
+	}
+
+	return 0, false
+}
+
+func isProductAt(tokens []tokenizer.Token, idx int, name string) bool {
+	return idx < len(tokens) && tokens[idx].Kind == tokenizer.KindProduct && tokens[idx].Name == name
 }
 
 func isHTTPClientUA(raw string) bool {
@@ -212,9 +253,43 @@ func matchNativeProduct(tok tokenizer.Token, allTokens []tokenizer.Token, result
 		result.Native = NativeApp{Name: "python-requests", Version: tok.Version, Runtime: "Python"}
 
 		return true
+	case "Pinterest":
+		result.Native = NativeApp{Name: "Pinterest", Version: versionAfterFor(allTokens)}
+
+		return true
 	default:
+		if strings.HasPrefix(tok.Name, "com.google.android.youtube") {
+			result.Native = NativeApp{Name: "YouTube", Version: tok.Version}
+
+			return true
+		}
+
 		return false
 	}
+}
+
+// versionAfterFor extracts the app version from "<App> for <Platform>/<version>" UAs,
+// where the version rides on the platform token.
+func versionAfterFor(tokens []tokenizer.Token) string {
+	seenFor := false
+
+	for _, t := range tokens {
+		if t.Kind != tokenizer.KindProduct {
+			continue
+		}
+
+		if t.Name == "for" {
+			seenFor = true
+
+			continue
+		}
+
+		if seenFor && t.Version != "" {
+			return t.Version
+		}
+	}
+
+	return ""
 }
 
 func fillCFNetworkAppName(tokens []tokenizer.Token, result *Result) {

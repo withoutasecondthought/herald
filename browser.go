@@ -8,12 +8,33 @@ import (
 
 const productsMapCap = 8
 
+// tokenBrowsers get their engine from engineByChrome: these browsers are Blink
+// on Android/desktop but WebKit in their iOS builds, which reuse the same token.
+//
+//nolint:gochecknoglobals // read-only lookup table
+var tokenBrowsers = []struct{ token, name string }{
+	{"YaBrowser", "Yandex Browser"},
+	{"SamsungBrowser", "Samsung Browser"},
+	{"UCBrowser", "UC Browser"},
+	{"HuaweiBrowser", "Huawei Browser"},
+	{"MiuiBrowser", "Mi Browser"},
+	{"Whale", "Whale"},
+	{"MQQBrowser", "QQ Browser"},
+	{"OPX", "Opera GX"},
+	{"DuckDuckGo", "DuckDuckGo"},
+	{"GSA", "Google App"},
+}
+
 // detectBrowser identifies the browser from product tokens using priority matching.
 // Order matters — more specific browsers must be checked before generic ones.
 func detectBrowser(tokens []tokenizer.Token, result *Result) {
 	products := buildProductMap(tokens)
 
-	if matchSpecificBrowsers(products, result) {
+	if matchFBBrowser(tokens, products, result) {
+		return
+	}
+
+	if matchSpecificBrowsers(tokens, products, result) {
 		return
 	}
 
@@ -36,54 +57,167 @@ func buildProductMap(tokens []tokenizer.Token) map[string]string {
 	return products
 }
 
-func matchSpecificBrowsers(products map[string]string, result *Result) bool {
-	if v, ok := findAny(products, "Edg", "EdgA", "EdgIOS"); ok {
-		result.Browser = Browser{Name: "Edge", Version: v, Engine: EngineBlink}
+func matchFBBrowser(tokens []tokenizer.Token, products map[string]string, result *Result) bool {
+	for _, tok := range tokens {
+		if tok.Kind != tokenizer.KindFBBlock {
+			continue
+		}
+
+		fb := parseFBAttrs(tok.Attrs)
+
+		app, ok := fb["FBAN"]
+		if !ok {
+			app, ok = fb["FB_IAB"]
+		}
+
+		if !ok || app == "" {
+			continue
+		}
+
+		result.Browser = Browser{Name: fbAppName(app), Version: fb["FBAV"], Engine: engineByChrome(products)}
+
+		return true
+	}
+
+	return false
+}
+
+func matchSpecificBrowsers(tokens []tokenizer.Token, products map[string]string, result *Result) bool {
+	if v, ok := findAny(products, "Edg", "EdgA", "EdgiOS"); ok {
+		result.Browser = Browser{Name: "Edge", Version: v, Engine: engineByChrome(products)}
 
 		return true
 	}
 
 	if v, ok := findAny(products, "OPR", "OPRTouchPhone"); ok {
-		result.Browser = Browser{Name: "Opera", Version: v, Engine: EngineBlink}
+		result.Browser = Browser{Name: "Opera", Version: v, Engine: engineByChrome(products)}
 
 		return true
 	}
 
-	if v, ok := products["YaBrowser"]; ok {
-		result.Browser = Browser{Name: "Yandex Browser", Version: v, Engine: EngineBlink}
+	if v, ok := products["OPiOS"]; ok {
+		result.Browser = Browser{Name: "Opera Mini", Version: v, Engine: EngineWebKit}
 
 		return true
 	}
 
-	if v, ok := products["SamsungBrowser"]; ok {
-		result.Browser = Browser{Name: "Samsung Browser", Version: v, Engine: EngineBlink}
-
+	if matchTokenBrowsers(products, result) {
 		return true
 	}
 
-	if v, ok := products["FBAV"]; ok {
-		result.Browser = Browser{Name: "Facebook", Version: v, Engine: EngineWebKit}
-
+	if matchMiBrowser(products, result) {
 		return true
 	}
 
-	for name, v := range products {
-		if strings.HasPrefix(name, "Instagram") {
-			engine := EngineWebKit
-			if _, hasChrome := products["Chrome"]; hasChrome {
-				engine = EngineBlink
-			}
+	if matchInstagram(products, result) {
+		return true
+	}
 
-			result.Browser = Browser{Name: "Instagram", Version: v, Engine: engine}
+	if matchTikTokBrowser(tokens, products, result) {
+		return true
+	}
+
+	if matchTwitterBrowser(tokens, products, result) {
+		return true
+	}
+
+	return matchOperaMini(tokens, result)
+}
+
+func matchTokenBrowsers(products map[string]string, result *Result) bool {
+	for _, e := range tokenBrowsers {
+		if v, ok := products[e.token]; ok {
+			result.Browser = Browser{Name: e.name, Version: v, Engine: engineByChrome(products)}
 
 			return true
 		}
 	}
 
-	if v, ok := products["musical_ly"]; ok {
-		result.Browser = Browser{Name: "TikTok", Version: v, Engine: EngineWebKit}
+	return false
+}
 
-		return true
+// matchMiBrowser handles the nested-slash token "XiaoMi/MiuiBrowser/14.44.1-gn",
+// which tokenizes as product "XiaoMi" with version "MiuiBrowser/14.44.1-gn".
+func matchMiBrowser(products map[string]string, result *Result) bool {
+	v, ok := products["XiaoMi"]
+	if !ok {
+		return false
+	}
+
+	ver, ok := strings.CutPrefix(v, "MiuiBrowser/")
+	if !ok {
+		return false
+	}
+
+	result.Browser = Browser{Name: "Mi Browser", Version: ver, Engine: EngineBlink}
+
+	return true
+}
+
+func matchTwitterBrowser(tokens []tokenizer.Token, products map[string]string, result *Result) bool {
+	for i, tok := range tokens {
+		if tok.Kind != tokenizer.KindProduct {
+			continue
+		}
+
+		if tok.Name == tokenTwitterAndroid {
+			result.Browser = Browser{Name: appTwitter, Version: tok.Version, Engine: engineByChrome(products)}
+
+			return true
+		}
+
+		if tok.Name == appTwitter {
+			if dev, ok := twitterForTarget(tokens, i); ok {
+				result.Browser = Browser{Name: appTwitter, Version: dev.Version, Engine: engineByChrome(products)}
+
+				return true
+			}
+		}
+	}
+
+	return false
+}
+
+func matchInstagram(products map[string]string, result *Result) bool {
+	for name, v := range products {
+		if strings.HasPrefix(name, "Instagram") {
+			result.Browser = Browser{Name: "Instagram", Version: v, Engine: engineByChrome(products)}
+
+			return true
+		}
+	}
+
+	return false
+}
+
+func matchTikTokBrowser(tokens []tokenizer.Token, products map[string]string, result *Result) bool {
+	app, version, ok := tikTokApp(tokens)
+	if !ok {
+		return false
+	}
+
+	result.Browser = Browser{Name: app, Version: version, Engine: engineByChrome(products)}
+
+	return true
+}
+
+// matchOperaMini handles Opera Mini extreme-savings mode on Android,
+// where the identifier lives inside the comment: "(Android; Opera Mini/33.0.2254/174.101; U; en)".
+func matchOperaMini(tokens []tokenizer.Token, result *Result) bool {
+	for _, tok := range tokens {
+		if tok.Kind != tokenizer.KindComment {
+			continue
+		}
+
+		for _, attr := range tok.Attrs {
+			if v, ok := strings.CutPrefix(strings.TrimSpace(attr), "Opera Mini/"); ok {
+				version, _, _ := strings.Cut(v, "/")
+
+				result.Browser = Browser{Name: "Opera Mini", Version: version, Engine: EnginePresto}
+
+				return true
+			}
+		}
 	}
 
 	return false
@@ -126,6 +260,14 @@ func matchGenericBrowsers(products map[string]string, result *Result) bool {
 	}
 
 	return false
+}
+
+func engineByChrome(products map[string]string) string {
+	if _, ok := products["Chrome"]; ok {
+		return EngineBlink
+	}
+
+	return EngineWebKit
 }
 
 func matchIE(tokens []tokenizer.Token, result *Result) {

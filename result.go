@@ -55,6 +55,7 @@ const (
 	EngineWebKit  = "WebKit"
 	EngineGecko   = "Gecko"
 	EngineTrident = "Trident"
+	EnginePresto  = "Presto"
 )
 
 // Well-known product/browser token names.
